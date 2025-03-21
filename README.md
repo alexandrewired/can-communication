@@ -7,88 +7,129 @@ CAN Bus differential Signaling - CAN bus uses two differential signal lines—CA
 ### Example of a transmitter node that sends "Hello":
 ```ruby
 
-#include <SPI.h>
-#include "mcp_can.h"
+#include <Arduino.h>
+#include "driver/twai.h"
 
-const int SPI_CS_PIN = 10;  // Change if needed
-MCP_CAN CAN(SPI_CS_PIN);
+// Define the CAN TX and RX pins (adjust these to your wiring)
+#define CAN_TX_PIN 5
+#define CAN_RX_PIN 4
+
+// Function to initialize the TWAI driver
+void setupCAN() {
+  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
+  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
+  twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
+  if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
+    Serial.println("TWAI driver installed.");
+  } else {
+    Serial.println("Failed to install TWAI driver.");
+  }
+
+  if (twai_start() == ESP_OK) {
+    Serial.println("TWAI driver started.");
+  } else {
+    Serial.println("Failed to start TWAI driver.");
+  }
+}
 
 void setup() {
   Serial.begin(115200);
-  while (CAN_OK != CAN.begin(CAN_500KBPS)) {
-    Serial.println("CAN init fail, retrying...");
-    delay(100);
-  }
-  Serial.println("CAN init OK!");
+  setupCAN();
 }
 
 void loop() {
-  // Prepare the data bytes for "Hello"
-  byte data[5] = {'H', 'e', 'l', 'l', 'o'};
-  
-  // Send the message with identifier 0x100
-  if (CAN.sendMsgBuf(0x100, 0, 5, data) == CAN_OK) {
+  // Prepare a message to send "Hello"
+  twai_message_t tx_msg;
+  tx_msg.identifier = 0x100;        // Standard CAN ID
+  tx_msg.extd = 0;                  // Using standard (11-bit) identifier
+  tx_msg.rtr = 0;                   // Data frame, not a remote frame
+  tx_msg.data_length_code = 5;      // 5 bytes of data
+  tx_msg.data[0] = 'H';
+  tx_msg.data[1] = 'e';
+  tx_msg.data[2] = 'l';
+  tx_msg.data[3] = 'l';
+  tx_msg.data[4] = 'o';
+
+  // Transmit the message (timeout of 1000 ms)
+  if (twai_transmit(&tx_msg, pdMS_TO_TICKS(1000)) == ESP_OK) {
     Serial.println("Sent: Hello");
   } else {
-    Serial.println("Send error");
+    Serial.println("Transmit error");
   }
-  
-  delay(1000);  // Send every second
+
+  vTaskDelay(pdMS_TO_TICKS(1000));  // Send every second
 }
 ```
 
 ### Example of a receiver node that receives "Hello":
 ```ruby
 
-#include <SPI.h>
-#include "mcp_can.h"
+#include <Arduino.h>
+#include "driver/twai.h"
 
-const int SPI_CS_PIN = 10;  // Change if needed
-MCP_CAN CAN(SPI_CS_PIN);
+// Define the CAN TX and RX pins (use the same wiring as on the transmitter)
+#define CAN_TX_PIN 5
+#define CAN_RX_PIN 4
+
+// Function to initialize the TWAI driver
+void setupCAN() {
+  twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX_PIN, CAN_RX_PIN, TWAI_MODE_NORMAL);
+  twai_timing_config_t t_config = TWAI_TIMING_CONFIG_500KBITS();
+  twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
+  if (twai_driver_install(&g_config, &t_config, &f_config) == ESP_OK) {
+    Serial.println("TWAI driver installed.");
+  } else {
+    Serial.println("Failed to install TWAI driver.");
+  }
+
+  if (twai_start() == ESP_OK) {
+    Serial.println("TWAI driver started.");
+  } else {
+    Serial.println("Failed to start TWAI driver.");
+  }
+}
 
 void setup() {
   Serial.begin(115200);
-  while (CAN_OK != CAN.begin(CAN_500KBPS)) {
-    Serial.println("CAN init fail, retrying...");
-    delay(100);
-  }
-  Serial.println("CAN init OK!");
+  setupCAN();
 }
 
 void loop() {
-  if (CAN_MSGAVAIL == CAN.checkReceive()) {
-    long unsigned int rxId;
-    byte len = 0;
-    byte rxBuf[8];
-    
-    CAN.readMsgBuf(&rxId, &len, rxBuf);
-    
+  twai_message_t rx_msg;
+
+  // Wait up to 1000ms for a message to be received
+  if (twai_receive(&rx_msg, pdMS_TO_TICKS(1000)) == ESP_OK) {
     Serial.print("Received [ID: 0x");
-    Serial.print(rxId, HEX);
+    Serial.print(rx_msg.identifier, HEX);
     Serial.print("]: ");
-    
-    // Convert received bytes into a string
-    String message = "";
-    for (int i = 0; i < len; i++) {
-      message += (char)rxBuf[i];
+    for (int i = 0; i < rx_msg.data_length_code; i++) {
+      Serial.print((char)rx_msg.data[i]);
     }
-    Serial.println(message);
+    Serial.println();
+  } else {
+    // No message received in the specified timeout
+    // Optionally, add a debug message here.
   }
+
+  vTaskDelay(pdMS_TO_TICKS(10));
 }
 ```
 
 ## How It Works
+  **TWAI (CAN) initialization:**
+  <ol>
+  <li>Both sketches initialize the ESP32’s built-in TWAI (CAN) driver using a configuration structure. The CAN timing is set to 500 kbps, and a filter that accepts all messages is used.</li>
+  </ol>
 
   **Transmitter Node:**
   <ol>
-  <li>Initializes the CAN bus at 500 kbps.</li>
-  <li>Sends a 5-byte message containing the ASCII characters for "Hello" every second.</li>
+  <li>The transmitter creates a CAN message with standard identifier 0x100 and 5 bytes containing "Hello". It then transmits the message every second.</li>
   </ol> 
    
 
   **Receiver Node:**
   <ol>
-  <li>Initializes the CAN bus at 500 kbps.</li>
-  <li>Continuously checks for incoming messages.</li>
-  <li>Reads the message, converts the received bytes into a string, and prints it to the serial monitor.</li>
+  <li>The receiver waits for a message (with a timeout of 1000 ms), then prints the CAN identifier and converts the received bytes into a string to display the message.</li>
   </ol> 
