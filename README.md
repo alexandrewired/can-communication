@@ -119,17 +119,14 @@ void loop() {
 
 ## How It Works
   **TWAI (CAN) initialization:**
-  <ol>
-  <li>Both sketches initialize the ESP32’s built-in TWAI (CAN) driver using a configuration structure. The CAN timing is set to 500 kbps, and a filter that accepts all messages is used.</li>
-  </ol>
+  
+Both sketches initialize the ESP32’s built-in TWAI (CAN) driver using a configuration structure. The CAN timing is set to 500 kbps, and a filter that accepts all messages is used.
 
   **Transmitter Node:**
-  <ol>
-  <li>The transmitter creates a CAN message with standard identifier 0x100 and 5 bytes containing "Hello". It then transmits the message every second.</li>
-  </ol> 
+
+The transmitter creates a CAN message with standard identifier 0x100 and 5 bytes containing "Hello". It then transmits the message every second.
    
 
   **Receiver Node:**
-  <ol>
-  <li>The receiver waits for a message (with a timeout of 1000 ms), then prints the CAN identifier and converts the received bytes into a string to display the message.</li>
-  </ol> 
+
+The receiver waits for a message (with a timeout of 1000 ms), then prints the CAN identifier and converts the received bytes into a string to display the message.
