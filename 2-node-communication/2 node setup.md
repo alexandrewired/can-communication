@@ -1,1 +1,0 @@
-3x ESP32s and 3x CJMCU-1051
